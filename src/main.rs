@@ -1,37 +1,43 @@
-use serde::Serialize;
-use serde_json;
-use v_utils::llm;
+use decide::{Case, Cases};
+use std::path::{Path, PathBuf};
 
-pub static TMP_DIR: &str = "/tmp/mai_reader_cache";
+mod decide;
+pub mod mail;
 
-#[derive(Debug, Serialize)]
-pub struct Message {
-	pub contents: String,
-	pub sender: String,
+lazy_static::lazy_static! {
+	pub static ref TMP_DIR: PathBuf = Path::new("/tmp/mail_talker_cache/").to_path_buf();
 }
 
+// could put the tasks up on hackmd.io
+// Would need a tiny little parser then
+
+// to test, let's make tests that take in a conversation and roll through the entirety of it, printing to stderr
+// Then feed my 3 threads with them to it
+
 fn main() {
-	let interaction = [
-		Message {
-			contents: "GET ME IN".to_string(),
-			sender: "them".to_string(),
-		},
-		Message {
-			contents: "What position do you want in on?".to_string(),
-			sender: "us".to_string(),
-		},
-		Message {
-			contents: "I want to be your CEO".to_string(),
-			sender: "them".to_string(),
-		},
-	];
+	std::fs::create_dir_all(TMP_DIR.clone()).unwrap();
 
-	let interaction_str = serde_json::to_string(&interaction).unwrap();
+	let interaction = vec![mail::Message {
+		contents: "I want to be your CEO".to_string(),
+		sender: "them".to_string(),
+	}];
 
-	let response = llm::oneshot(
-		format!("From this email conversation, what does the candidate want: {}", interaction_str),
-		llm::Model::Fast,
-	)
-	.unwrap();
-	println!("{}", response);
+	let cases = Cases(vec![
+		Case::new("position", "candidate wants a position", "Tell him he can't have it"),
+		Case::new(
+			"update",
+			"candidate asking about result of interview / take-home submission",
+			"tell him to wait",
+		),
+		Case::new("next_steps", "candidate asking about next steps", "tell him to wait"),
+	]);
+
+	let case = decide::determine_case(&interaction, &cases).unwrap();
+	dbg!(&case);
+
+	let answer = match case {
+		Some(c) => Some(decide::compose(&interaction, &c).unwrap()),
+		None => None,
+	};
+	dbg!(&answer);
 }
