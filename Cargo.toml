@@ -11,3 +11,4 @@ reqwest = { version = "0.11.26", features = ["json", "blocking"] }
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.114"
 v_utils = { version = "1.0.9", features = ["llm"] }
+regex = "1.10.3"

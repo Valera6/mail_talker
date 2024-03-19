@@ -1,4 +1,4 @@
-use crate::decide::Case;
+use crate::llm::Case;
 use crate::mail;
 use anyhow::Result;
 use v_utils::llm;

@@ -2,7 +2,7 @@ use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct Message {
-	pub contents: String,
+	pub content: String,
 	pub sender: String,
 }
 
