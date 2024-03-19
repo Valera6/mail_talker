@@ -3,7 +3,7 @@ use anyhow::{anyhow, Result};
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use v_utils::llm;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Case {
 	pub key: &'static str,
 	pub situation: &'static str,
@@ -46,7 +46,7 @@ pub fn determine_case(interaction: &Vec<mail::Message>, cases: &Cases) -> Result
 		format!(r#"We just received a new message on our company email. The following is the entirety of the conversation up to this point:  ```{}
 ```
 
-Your job is to decide whether this is one of the outlined special cases and we can pass it onto our system of auto-answering. Here are all of the special cases: ```json
+Your job is to decide whether _the last message_ is one of the outlined special cases and we can pass it onto our system of auto-answering. Here are all of the special cases: ```json
 {}
 ```
 
@@ -55,7 +55,7 @@ You return a json code-block like ```json
 	"case": String
 }}
 ```
-Where "case" is the key of the situation or null if none obviously match"#,
+Where "case" is the key of the situation or null if none obviously match. Note that we only care whether the last message matches."#,
 			serde_json::to_string(&interaction).unwrap(),
 			serde_json::to_string(&cases).unwrap()
 		),

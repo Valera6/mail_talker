@@ -4,7 +4,7 @@ use crate::{MODEL, TMP_DIR};
 use anyhow::Result;
 use serde::Deserialize;
 use std::io::Write;
-use tracing::{info, instrument};
+use tracing::info;
 use v_utils::llm;
 
 #[derive(Debug, Deserialize)]
