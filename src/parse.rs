@@ -3,7 +3,6 @@ use crate::TMP_DIR;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::fs;
-use std::path::Path;
 use std::process::Command;
 
 lazy_static! {

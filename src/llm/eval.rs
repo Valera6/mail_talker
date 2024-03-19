@@ -1,8 +1,10 @@
+use crate::llm::TaskSpec;
 use crate::parse::FileContents;
 use crate::{MODEL, TMP_DIR};
 use anyhow::Result;
 use serde::Deserialize;
 use std::io::Write;
+use tracing::{info, instrument};
 use v_utils::llm;
 
 #[derive(Debug, Deserialize)]
@@ -22,7 +24,9 @@ impl std::fmt::Display for Evaluation {
 		write!(f, "\nMean Score: {}\nDecision: {}\nOther:\n{}", self.mean_score, self.decision, self.other)
 	}
 }
-pub fn evaluate(task: &str, eval_metrics: Vec<&str>, position: &str, file_contents: &Vec<FileContents>) -> Result<Evaluation> {
+pub fn evaluate(task_spec: &TaskSpec, eval_metrics: &Vec<&str>, file_contents: &Vec<FileContents>) -> Result<Evaluation> {
+	let task = &task_spec.task;
+	let position = &task_spec.position;
 	let temp_cache_file = TMP_DIR.join("eval.md");
 	let mut file = std::fs::File::create(&temp_cache_file).expect(&format!("Failed to create or open file at {:?}", temp_cache_file));
 
@@ -62,9 +66,25 @@ Only return the ```json``` codeblock in the very end, _after_ having had evaluat
 	let response_str = response.extract_codeblock("json")?;
 	let requested_json: RequestedJson = serde_json::from_str(&response_str)?;
 
-	Ok(Evaluation {
+	let log_entry = format!(
+		"\n\n# -----------------------------------------------------------------------------\n\n## Response\n{}",
+		response
+	);
+	file.write_all(log_entry.as_bytes()).expect("Failed to write response to file");
+
+	let evaluation = Evaluation {
 		mean_score: requested_json.mean_score,
 		decision: requested_json.is_suitable,
 		other: response.to_string(),
-	})
+	};
+
+	let log_entry = format!(
+		"\n\n# -----------------------------------------------------------------------------\n\n## Evaluation\n{}",
+		evaluation
+	);
+	file.write_all(log_entry.as_bytes()).expect("Failed to write evaluation to file");
+
+	info!(mean_score = requested_json.mean_score, is_suitable = requested_json.is_suitable);
+
+	Ok(evaluation)
 }

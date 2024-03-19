@@ -19,18 +19,19 @@ lazy_static::lazy_static! {
 
 fn main() {
 	std::fs::create_dir_all(TMP_DIR.clone()).unwrap();
+	tracing_subscriber::fmt::init();
 
 	let interaction = vec![
 		mail::Message {
-			content: "I want to be your CEO".to_string(),
+			content: "I am a trader, with rust and python knowledge. Would love to work with you in any way shape or form.".to_string(),
 			sender: "them".to_string(),
 		},
 		mail::Message {
-			content: "Not happening".to_string(),
+			content: "I'm assuming you want a quant position. First show us what you got: create a parser of exchange documentations, to detect unannounced changes. Target time: 4 hours".to_string(),
 			sender: "us".to_string(),
 		},
 		mail::Message {
-			content: "But look what I made https://github.com/Valera6/doc_scraper.git".to_string(),
+			content: "Get me in!\n\nhttps://github.com/Valera6/doc_scraper.git".to_string(),
 			sender: "them".to_string(),
 		},
 	];
@@ -47,10 +48,15 @@ fn main() {
 
 	let case = match interaction.last().unwrap().content.contains("https://github.com/") {
 		true => Some({
-			//TODO: these 3 should be parsed from the mail exchange though
-			let contents = parse::extract("https://github.com/Valera6/doc_scraper.git");
-			let task = "create a parser of exchange documentations, to detect unannounced changes. Target time: 4 hours";
-			let position = "junior";
+			let link = interaction
+				.last()
+				.unwrap()
+				.content
+				.split_whitespace()
+				.find(|s| s.contains("https://github.com/"))
+				.unwrap();
+			let contents = parse::extract(link);
+			let task_spec = llm::extract_task_spec(&interaction).unwrap();
 
 			let eval_metrics = vec![
 				"reliability (ignore completely if small number of lines)",
@@ -60,7 +66,7 @@ fn main() {
 				"language used (python is `0/10` -> assembly `10/10`)",
 			];
 
-			let evalutaiton: llm::Evaluation = llm::evaluate(task, eval_metrics, position, &contents).unwrap(); //task is probably in the last message we sent ourselves. I guess could just ask llm.
+			let evalutaiton: llm::Evaluation = llm::evaluate(&task_spec, &eval_metrics, &contents).unwrap(); //task is probably in the last message we sent ourselves. I guess could just ask llm.
 			let action = match evalutaiton.decision {
 				true => "invite them for an interview; link is: https://calendly.com/valera6/interview",
 				false => "tell them they are sadly not suitable for the position",
@@ -69,7 +75,6 @@ fn main() {
 		}),
 		false => llm::determine_case(&interaction, &cases).unwrap(),
 	};
-	dbg!(&case);
 
 	let answer = match case {
 		Some(c) => Some(llm::compose(&interaction, &c).unwrap()),
