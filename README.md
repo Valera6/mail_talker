@@ -1,4 +1,18 @@
-# mail_talker
+<div align="center">
+  <h1>mail_talker</h1>
+  <p>
+    <strong>Auto-respond to some of the company mail</strong>
+  </p>
+  <p>
+
+<!-- prettier-ignore-start -->
+
+[![crates.io](https://img.shields.io/crates/v/v_utils?label=latest)](https://crates.io/crates/actix)
+![Minimum Supported Rust Version](https://img.shields.io/badge/rustc-1.74+-ab6000.svg)
+
+<!-- prettier-ignore-end -->
+</div>
+
 An llm pipeline to respond to known email patterns, and request/evaluate assignments of candidates if they apply for a position.
 
 In spirit of the codebase, this README.md is mostly LLM-generated, so don't bother reading.
@@ -6,10 +20,9 @@ In spirit of the codebase, this README.md is mostly LLM-generated, so don't both
 ## Design decisions
 As it's a proof of concept, this has absolute minimum of cases considered. Stability of the performance can be further improved by about 1.7x, via introduction of few-shot. Very very easy to do; but once implemented, improvements by other means are capped /* open an issue if this needs explaining */.
 
-For functionality could add a step for shaping eval based on the open positions, but codebase is getting a bit large for a proof of concept.
+For functionality could add a step for shaping take-home assignment based on the currently open positions, but codebase is getting a bit convoluted for showcasing a proof of concept.
 
 I could also do the resume parsing here, but better to first ensure the existing implementation is stable enough, as we would be stacking llm errors otherwise.
-
 
 ## Features
 
