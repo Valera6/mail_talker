@@ -13,8 +13,6 @@ lazy_static::lazy_static! {
 	pub static ref MODEL: Model = Model::Medium;
 }
 
-//TODO: Feed my 3 threads with martin to test functions.
-
 fn determine_case(interaction: &Vec<mail::Message>) -> Result<Option<Case>> {
 	assert!(!interaction.is_empty());
 
@@ -79,9 +77,13 @@ fn main() {
 			sender: "us".to_string(),
 		},
 		mail::Message {
-			content: "Get me in!\n\nhttps://github.com/Valera6/doc_scraper.git".to_string(),
+			content: "Get me in!\n\nhttps://github.com/Valera6/mail_talker".to_string(),
 			sender: "them".to_string(),
 		},
+		//mail::Message {
+		//	content: "Get me in!\n\nhttps://github.com/Valera6/doc_scraper.git".to_string(),
+		//	sender: "them".to_string(),
+		//},
 	];
 	let case = determine_case(&interaction).unwrap();
 	info!(?case);
