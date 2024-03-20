@@ -42,26 +42,24 @@ struct RequestedJson {
 }
 
 pub fn determine_case(interaction: &Vec<mail::Message>, cases: &Cases) -> Result<Option<Case>> {
-	let response = llm::oneshot(
-		format!(r#"We just received a new message on our company email. The following is the entirety of the conversation up to this point:  ```{}
+	let q = format!(
+		r#"We just received a new message on our company email. The following is the entirety of the conversation up to this point:  ```{}
 ```
 
-Your job is to decide whether _the last message_ is one of the outlined special cases and we can pass it onto our system of auto-answering. Here are all of the special cases: ```json
+Your job is to decide whether the last message in the conversation is one of the outlined special cases. Here are all of the special cases: ```json
 {}
 ```
 
 You return a json code-block like ```json
 {{
-	"case": String
+	"case": null or string
 }}
 ```
-Where "case" is the key of the situation or null if none obviously match. Note that we only care whether the last message matches."#,
-			serde_json::to_string(&interaction).unwrap(),
-			serde_json::to_string(&cases).unwrap()
-		),
-		llm::Model::Fast,
-	)
-	.unwrap();
+Where "case" is the key of the situation or `null` if none match. If a previous message matches, but not the last - return `null`. By default assume `null`."#,
+		serde_json::to_string(&interaction).unwrap(),
+		serde_json::to_string(&cases).unwrap()
+	);
+	let response = llm::oneshot(q, llm::Model::Fast).unwrap();
 	let r: RequestedJson = serde_json::from_str(&response.extract_codeblock("json")?)?;
 	Ok(match r.case {
 		Some(s) => Some(cases.by_key(s).ok_or_else(|| anyhow!("Llm returned a non-existent key"))?.clone()),

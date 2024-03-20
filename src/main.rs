@@ -1,5 +1,7 @@
+use anyhow::Result;
 use llm::{Case, Cases};
 use std::path::{Path, PathBuf};
+use tracing::info;
 use v_utils::llm::Model;
 
 mod llm;
@@ -11,23 +13,19 @@ lazy_static::lazy_static! {
 	pub static ref MODEL: Model = Model::Medium;
 }
 
-// could put the tasks up on hackmd.io
-// Would need a tiny little parser then
+//TODO: Feed my 3 threads with martin to test functions.
 
-// to test, let's make tests that take in a conversation and roll through the entirety of it, printing to stderr
-// Then feed my 3 threads with them to it
-
-fn determine_case(interaction: &Vec<mail::Message>) -> Option<Case> {
+fn determine_case(interaction: &Vec<mail::Message>) -> Result<Option<Case>> {
 	assert!(!interaction.is_empty());
 
 	let cases = Cases(vec![
 		Case::new("position", "candidate wants a position", "Tell him he can't have it"),
 		Case::new(
-			"update",
+			"request_for_update",
 			"candidate asking about result of interview / take-home submission",
 			"tell him to wait",
 		),
-		Case::new("next_steps", "candidate asking about next steps", "tell him to wait"),
+		Case::new("next_steps_question", "candidate asking about next steps", "tell him to wait"),
 	]);
 
 	let case = match interaction.last().unwrap().content.contains("https://github.com/") {
@@ -39,32 +37,29 @@ fn determine_case(interaction: &Vec<mail::Message>) -> Option<Case> {
 				.split_whitespace()
 				.find(|s| s.contains("https://github.com/"))
 				.unwrap();
-			let contents = parse::extract(link);
+			info!(link);
+			let contents = parse::extract(link)?;
 			let task_spec = llm::extract_task_spec(&interaction).unwrap();
+			info!(?task_spec);
 
-			let eval_metrics = vec![
-				"reliability (ignore completely if small number of lines)",
-				"maintainability (ignore completely if small number of lines)",
-				"interface",
-				"effort (100 lines is `0/10` ->  1000 lines `10/10`)",
-				"language used (python is `0/10` -> assembly `10/10`)",
-			];
+			let eval_metrics = llm::EvalMetrics::from_file_contents(&contents);
 
-			let evalutaiton: llm::Evaluation = llm::evaluate(&task_spec, &eval_metrics, &contents).unwrap();
-			let (decision, action) = match evalutaiton.decision {
-				true => ("GOOD", "invite them for an interview; link is: https://calendly.com/valera6/interview"),
-				false => ("BAD", "tell them they are sadly not suitable for the position"),
+			let evaluation: llm::Evaluation = llm::evaluate(&task_spec, &eval_metrics, &contents).unwrap();
+			let (decision, action) = match evaluation.decision {
+				// could also fix a higher standard, but a) if the target position is inherintly weak, we would lose them b) LLMs start getting wabbly at extremes, as they hate polarization.
+				true if evaluation.mean_score > 5.0 => ("GOOD", "invite them for an interview; link is: https://calendly.com/valera6/interview"),
+				_ => ("BAD", "tell them they are sadly not suitable for the position"),
 			};
 			Case::new("auto_eval", decision, action)
 		}),
 		false => llm::determine_case(&interaction, &cases).unwrap(),
 	};
-	case
+	Ok(case)
 }
 
-fn answer_if_possible(interaction: &Vec<mail::Message>, case: &Case) -> Option<String> {
+fn answer_if_possible(interaction: &Vec<mail::Message>, case: Option<Case>) -> Option<String> {
 	let answer = match case {
-		Some(c) => Some(llm::compose(interaction, c).unwrap()),
+		Some(c) => Some(llm::compose(interaction, &c).unwrap()),
 		None => None,
 	};
 	answer
@@ -88,17 +83,21 @@ fn main() {
 			sender: "them".to_string(),
 		},
 	];
-	let case = determine_case(&interaction);
-	let answer = answer_if_possible(&interaction, &case);
+	let case = determine_case(&interaction).unwrap();
+	info!(?case);
+	let answer = answer_if_possible(&interaction, case);
 	println!("{:?}", answer);
 }
 
-//TODO: alongside the LLM evaluation, would be great to staticly count the following:
-// - number of symbols against the average on the task
-
 #[cfg(test)]
 mod tests {
-	use super::*; // Import the outer scope (including the greet function).
+	use super::*;
+
+	#[test]
+	fn _setup_tracing() {
+		// Not a test, but seems like the only way to get tracing to work during them.
+		tracing_subscriber::fmt::init();
+	}
 
 	#[test]
 	fn cases_1() {
@@ -130,8 +129,8 @@ mod tests {
 		for i in (0..interaction.len()).step_by(2) {
 			let slice: Vec<mail::Message> = interaction[..=i].to_vec();
 
-			let case = determine_case(&slice);
-			println!("{:?}", case);
+			let case = determine_case(&slice).unwrap();
+			println!("Got: {:?}\nCorrect key: {}", case, correct_keys[i / 2]);
 			match case {
 				Some(c) => assert!(correct_keys[i / 2] == c.key),
 				None => assert!(correct_keys[i / 2] == ""),
@@ -156,7 +155,9 @@ mod tests {
 			},
 		];
 
-		let case = determine_case(&interaction).unwrap();
+		let case = determine_case(&interaction)
+			.unwrap()
+			.expect("Has to be Some, as the last message has a github link");
 		assert_eq!(case.key, "auto_eval");
 		assert_eq!(case.situation, "BAD");
 	}

@@ -1,4 +1,5 @@
 # mail_talker
+I could also do the resume parsing here, but better to first ensure the existing implementation is stable enough, as we would be stacking llm errors otherwise.
 
 ## License
 This project is available under the [MIT](LICENSE-MIT) or [Apache 2.0](LICENSE-APACHE) licenses, at your choice.
