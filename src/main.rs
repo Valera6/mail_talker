@@ -51,21 +51,20 @@ fn determine_case(interaction: &Vec<mail::Message>) -> Option<Case> {
 			];
 
 			let evalutaiton: llm::Evaluation = llm::evaluate(&task_spec, &eval_metrics, &contents).unwrap();
-			let action = match evalutaiton.decision {
-				true => "invite them for an interview; link is: https://calendly.com/valera6/interview",
-				false => "tell them they are sadly not suitable for the position",
+			let (decision, action) = match evalutaiton.decision {
+				true => ("GOOD", "invite them for an interview; link is: https://calendly.com/valera6/interview"),
+				false => ("BAD", "tell them they are sadly not suitable for the position"),
 			};
-			Case::new("auto_eval", "AUTO-DETECTED", action)
+			Case::new("auto_eval", decision, action)
 		}),
 		false => llm::determine_case(&interaction, &cases).unwrap(),
 	};
 	case
 }
 
-fn take_a_look(interaction: &Vec<mail::Message>) -> Option<String> {
-	let case = determine_case(&interaction);
+fn answer_if_possible(interaction: &Vec<mail::Message>, case: &Case) -> Option<String> {
 	let answer = match case {
-		Some(c) => Some(llm::compose(&interaction, &c).unwrap()),
+		Some(c) => Some(llm::compose(interaction, c).unwrap()),
 		None => None,
 	};
 	answer
@@ -89,42 +88,27 @@ fn main() {
 			sender: "them".to_string(),
 		},
 	];
-	let answer = take_a_look(&interaction);
+	let case = determine_case(&interaction);
+	let answer = answer_if_possible(&interaction, &case);
 	println!("{:?}", answer);
 }
 
 //TODO: alongside the LLM evaluation, would be great to staticly count the following:
 // - number of symbols against the average on the task
 
-//	//let contents = parse::extract("https://github.com/Valera6/doc_scraper.git");
-//	//let task = "create a parser of exchange documentations, to detect unannounced changes. Target time: 4 hours";
-//	//let position = "junior";
-//
-//	//let contents = parse::extract("https://github.com/Valera6/auto_eval.git");
-//	//let task = "creata a way to auto-evaluate the performance of a candidate for a position of a programmer";
-//	//let position = "senior software engineer";
-//
-//	//let contents = parse::extract("https://github.com/Valera6/monopoly.git");
-//	//let task = "create a monopoly game";
-//	//let position = "senior software engineer";
-//
-//	let contents = parse::extract("https://github.com/lunarcon/pyfractals");
-//	let task = "create a fractal generator";
-//	let position = "senior software engineer";
-
 #[cfg(test)]
 mod tests {
 	use super::*; // Import the outer scope (including the greet function).
 
 	#[test]
-	fn test_1() {
+	fn cases_1() {
 		let interaction = vec![
 			mail::Message {
 				content: "I am a trader, with rust and python knowledge. Would love to work with you in any way shape or form.".to_string(),
 				sender: "them".to_string(),
 			},
 			mail::Message {
-				content: "I'm assuming you want a quant position. First show us what you got: create a parser of exchange documentations, to detect unannounced changes. Target time: 4 hours".to_string(),
+				content: "I'm assuming you want a quant position. First show us what you got: create a parser of exchange documentations, to detect unannounced changes. Target time: 4 hours. Upload to github and send us the link.".to_string(),
 				sender: "us".to_string(),
 			},
 			mail::Message {
@@ -152,11 +136,28 @@ mod tests {
 				Some(c) => assert!(correct_keys[i / 2] == c.key),
 				None => assert!(correct_keys[i / 2] == ""),
 			}
-			// There isn't any reason to test this part, actually
-			//let answer = match case {
-			//	Some(c) => Some(llm::compose(&slice, &c).unwrap()),
-			//	None => None,
-			//}; // this is what `take_a_look` does. Here we want to dissect, so as to test both steps
 		}
+	}
+
+	#[test]
+	fn eval_1() {
+		let interaction = vec![
+			mail::Message {
+				content: "What do I need to do to get hired as a junior?".to_string(),
+				sender: "them".to_string(),
+			},
+			mail::Message {
+				content: "Create a fractals generator. Upload to github and send us the link.".to_string(),
+				sender: "us".to_string(),
+			},
+			mail::Message {
+				content: "I really really tried. Is this good? https://github.com/lunarcon/pyfractals".to_string(),
+				sender: "them".to_string(),
+			},
+		];
+
+		let case = determine_case(&interaction).unwrap();
+		assert_eq!(case.key, "auto_eval");
+		assert_eq!(case.situation, "BAD");
 	}
 }
